@@ -1,0 +1,17 @@
+name = "loops"
+main = "src/index.ts"
+compatibility_date = "2025-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[r2_buckets]]
+binding = "SCRIPTS"
+bucket_name = "loops-scripts"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "loops-logs"
+database_id = "4b0ad8b3-9c0e-42c0-90ec-1b73680feccf"
+
+[[kv_namespaces]]
+binding = "META"
+id = "3658e922e9024aa3905211b16c3f2b14"

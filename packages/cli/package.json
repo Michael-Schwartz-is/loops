@@ -1,0 +1,37 @@
+{
+  "name": "loops-cli",
+  "version": "0.1.0",
+  "description": "Live coding tool for Webflow. Edit scripts locally, sync to staging, debug with live logs.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "loops": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "webflow",
+    "live-coding",
+    "cli",
+    "scripts",
+    "staging"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --target node22 --clean",
+    "dev": "tsup src/index.ts --format esm --target node22 --watch"
+  },
+  "dependencies": {
+    "commander": "^13.0.0",
+    "chokidar": "^4.0.0"
+  },
+  "devDependencies": {
+    "@loops/shared": "*",
+    "tsup": "^8.0.0",
+    "typescript": "^5.5.0",
+    "@types/node": "^22.0.0"
+  }
+}

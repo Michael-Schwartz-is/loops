@@ -1,0 +1,10 @@
+{
+  "name": "loops",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "dev:worker": "npm run dev -w packages/worker",
+    "deploy": "npm run deploy -w packages/worker"
+  }
+}
