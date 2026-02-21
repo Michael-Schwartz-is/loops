@@ -23,6 +23,7 @@ export interface ProjectConfig {
 export interface ProjectMeta {
   name: string;
   version: number;
+  scripts: string[];
   createdAt: string;
   updatedAt: string;
 }

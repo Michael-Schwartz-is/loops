@@ -24,10 +24,26 @@ export async function addCommand(
 
   // Create the script file
   const scriptPath = path.join(projectDir, "scripts", `${scriptName}.js`);
-  await fs.writeFile(
-    scriptPath,
-    `// ${scriptName} — ${config.name}\nconsole.log("[Loops] ${scriptName} loaded");\n`
+  const code = `// ${scriptName} — ${config.name}\nconsole.log("[Loops] ${scriptName} loaded");\n`;
+  await fs.writeFile(scriptPath, code);
+
+  // Push to worker immediately so the script tag works right away
+  const pushRes = await fetch(
+    `${config.apiUrl}/code/${config.projectId}/${scriptName}`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "text/plain",
+        Authorization: `Bearer ${config.authToken}`,
+      },
+      body: code,
+    }
   );
+
+  if (!pushRes.ok) {
+    const body = await pushRes.text();
+    console.error(`Warning: failed to push script to worker: ${pushRes.status} ${body}`);
+  }
 
   // Update config
   config.scripts.push(scriptName);
@@ -38,9 +54,11 @@ export async function addCommand(
 
   const scriptTag = `<script src="${config.apiUrl}/s/${config.projectId}/${scriptName}"></script>`;
 
-  console.log(`\nAdded script "${scriptName}" to ${projectName}\n`);
-  console.log(`Paste this on the relevant page in Webflow → Before </body>:\n`);
+  console.log(`\nAdded script "${scriptName}" to ${projectName}.\n`);
+  console.log(`Paste this in Webflow on the relevant page → Custom Code → Before </body>:\n`);
   console.log(`  ${scriptTag}\n`);
+  console.log(`Next step: Run \`loops start\` to begin syncing.`);
+  console.log(`Then read ${projectName}/page-context.html for the live DOM class names before writing code.\n`);
 }
 
 async function updateLoopsMd(

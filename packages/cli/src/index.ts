@@ -7,6 +7,7 @@ import { startCommand } from "./commands/start.js";
 import { statusCommand } from "./commands/status.js";
 import { exportCommand } from "./commands/exportCmd.js";
 import { clearLogsCommand } from "./commands/clearLogs.js";
+import { DEFAULT_API_URL } from "./config.js";
 
 program
   .name("loops")
@@ -16,7 +17,7 @@ program
 program
   .command("init <project-name>")
   .description("Create a new Loops project")
-  .option("--api-url <url>", "API URL", "http://localhost:8787")
+  .option("--api-url <url>", "API URL", DEFAULT_API_URL)
   .action(initCommand);
 
 program
@@ -38,6 +39,7 @@ program
 program
   .command("status")
   .description("Show all projects and scripts")
+  .option("--remote", "Fetch server-side state for comparison")
   .action(statusCommand);
 
 program

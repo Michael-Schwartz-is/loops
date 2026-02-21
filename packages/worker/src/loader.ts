@@ -1,4 +1,5 @@
-export function generateLoader(apiBase: string, projectId: string, version: number): string {
+export function generateLoader(apiBase: string, projectId: string, version: number, scripts: string[]): string {
+  const scriptsJson = JSON.stringify(scripts);
   return `(function(){
 "use strict";
 if(!window.location.hostname.endsWith(".webflow.io"))return;
@@ -9,6 +10,7 @@ var LOG_URL=API+"/logs/"+PID;
 var EVT_URL=API+"/events/"+PID;
 var buf=[];
 var sv=${version};
+var SCRIPTS=${scriptsJson};
 var TAB=Math.random().toString(36).slice(2,10);
 
 function addLog(e){e.timestamp=new Date().toISOString();e.scriptVersion=sv;e.sessionId=TAB;buf.push(e)}
@@ -31,6 +33,8 @@ es.addEventListener("reload",function(){flush();setTimeout(function(){window.loc
 
 document.addEventListener("DOMContentLoaded",function(){var h=document.documentElement.outerHTML;h=h.replace(/<script[\\s\\S]*?<\\/script>/gi,"");h=h.replace(/<style[\\s\\S]*?<\\/style>/gi,"");h=h.replace(/<svg[\\s\\S]*?<\\/svg>/gi,"");var entry=[{type:"page-html",args:[h],page:window.location.href,timestamp:new Date().toISOString(),scriptVersion:sv,sessionId:TAB}];fetch(LOG_URL,{method:"POST",body:JSON.stringify(entry),headers:{"Content-Type":"application/json"},keepalive:true}).catch(function(){})});
 
-oc.log("[Loops] Connected — project "+PID);
+SCRIPTS.forEach(function(s){var el=document.createElement("script");el.src=API+"/s/"+PID+"/"+s+"?v="+sv;document.head.appendChild(el)});
+
+oc.log("[Loops] Connected — project "+PID+" v"+sv+" ("+SCRIPTS.length+" script"+(SCRIPTS.length===1?"":"s")+")");
 })();`;
 }

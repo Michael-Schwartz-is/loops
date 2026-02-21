@@ -6,6 +6,7 @@ import script from "./routes/script.js";
 import code from "./routes/code.js";
 import logs from "./routes/logs.js";
 import events from "./routes/events.js";
+import debug from "./routes/debug.js";
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -21,5 +22,6 @@ app.route("/", script);
 app.route("/", code);
 app.route("/", logs);
 app.route("/", events);
+app.route("/", debug);
 
 export default app;

@@ -18,7 +18,7 @@ app.get("/s/:projectId", async (c) => {
 
   const meta: ProjectMeta = JSON.parse(raw);
   const apiBase = new URL(c.req.url).origin;
-  const js = generateLoader(apiBase, projectId, meta.version);
+  const js = generateLoader(apiBase, projectId, meta.version, meta.scripts || []);
 
   return c.text(js, 200, {
     "Content-Type": "application/javascript",

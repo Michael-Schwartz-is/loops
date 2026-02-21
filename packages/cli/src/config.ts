@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { ProjectConfig } from "@loops/shared";
 
+export const DEFAULT_API_URL = "https://loops.mike-a99.workers.dev";
 const CONFIG_FILE = ".loops.json";
 
 export async function loadConfig(dir: string): Promise<ProjectConfig | null> {

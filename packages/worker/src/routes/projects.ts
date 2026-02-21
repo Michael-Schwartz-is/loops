@@ -16,6 +16,7 @@ app.post("/projects", async (c) => {
   const meta: ProjectMeta = {
     name,
     version: 0,
+    scripts: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { watch } from "chokidar";
@@ -23,19 +24,20 @@ export async function startCommand(opts: { pollInterval?: string }) {
     }
   }
 
-  console.log(`\nWatching ${projects.length} project(s)\n`);
+  console.log(`\nWatching ${projects.length} project(s)...\n`);
 
   for (const { dir, config } of projects) {
     const scriptCount = config.scripts.length;
     console.log(
-      `  ${config.name}: ${scriptCount} script(s)`
+      `  ${config.name}: ${scriptCount} script(s) — syncing to ${config.apiUrl}`
     );
 
     startWatcher(dir, config);
     startPoller(dir, config, interval);
   }
 
-  console.log("");
+  console.log(`\nScripts sync on save. Logs and page-context.html update automatically.`);
+  console.log(`Read page-context.html to see the live DOM before writing code.\n`);
 
   process.on("SIGINT", () => {
     console.log("\nLoops stopped.");
@@ -51,14 +53,21 @@ function startWatcher(projectDir: string, config: ProjectConfig) {
     awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
   });
 
-  let pushing = false;
+  const pushing = new Map<string, boolean>();
+  const pending = new Map<string, string>();
 
   const pushFile = async (filePath: string) => {
-    if (pushing) return;
-    pushing = true;
+    const scriptName = path.basename(filePath, ".js");
+
+    if (pushing.get(scriptName)) {
+      // A push is in flight — mark this file as needing another push
+      pending.set(scriptName, filePath);
+      return;
+    }
+
+    pushing.set(scriptName, true);
 
     try {
-      const scriptName = path.basename(filePath, ".js");
       const code = await fs.readFile(filePath, "utf-8");
 
       const res = await fetch(
@@ -79,14 +88,22 @@ function startWatcher(projectDir: string, config: ProjectConfig) {
       } else {
         const { version } = await res.json();
         const time = new Date().toLocaleTimeString();
+        const hash = crypto.createHash("sha256").update(code).digest("hex").slice(0, 8);
         console.log(
-          `[${time}] ${config.name}/${scriptName} → v${version} (${code.length}b)`
+          `[${time}] Synced ${config.name}/${scriptName} → v${version} (${code.length}b, ${hash})`
         );
       }
     } catch (err: any) {
       console.error(`  Push error: ${err.message}`);
     } finally {
-      pushing = false;
+      pushing.set(scriptName, false);
+
+      // If another change came in while we were pushing, push again
+      const pendingPath = pending.get(scriptName);
+      if (pendingPath) {
+        pending.delete(scriptName);
+        pushFile(pendingPath);
+      }
     }
   };
 
@@ -118,19 +135,7 @@ function startPoller(
       const newEntries: LogEntry[] = await res.json();
       if (newEntries.length === 0) return;
 
-      // Read existing, append, write
-      let existing: LogEntry[] = [];
-      try {
-        const raw = await fs.readFile(logsPath, "utf-8");
-        existing = JSON.parse(raw);
-      } catch {
-        existing = [];
-      }
-
-      const merged = [...existing, ...newEntries].slice(-1000);
-      await fs.writeFile(logsPath, JSON.stringify(merged, null, 2) + "\n");
-
-      // Extract latest page HTML context to a separate file
+      // Extract page HTML to its own file (not stored in logs)
       const pageHtmlEntries = newEntries.filter((e) => e.type === "page-html");
       if (pageHtmlEntries.length > 0) {
         const latest = pageHtmlEntries[pageHtmlEntries.length - 1];
@@ -139,6 +144,21 @@ function startPoller(
           const contextPath = path.join(projectDir, "page-context.html");
           await fs.writeFile(contextPath, html);
         }
+      }
+
+      // Store only non-HTML log entries
+      const logEntries = newEntries.filter((e) => e.type !== "page-html");
+      if (logEntries.length > 0) {
+        let existing: LogEntry[] = [];
+        try {
+          const raw = await fs.readFile(logsPath, "utf-8");
+          existing = JSON.parse(raw);
+        } catch {
+          existing = [];
+        }
+
+        const merged = [...existing, ...logEntries].slice(-1000);
+        await fs.writeFile(logsPath, JSON.stringify(merged, null, 2) + "\n");
       }
 
       lastTimestamp = newEntries[newEntries.length - 1].timestamp;
@@ -153,10 +173,10 @@ function startPoller(
       const time = new Date().toLocaleTimeString();
       if (errors.length > 0) {
         console.log(
-          `[${time}] ${config.name}: +${newEntries.length} logs (${errors.length} error(s))`
+          `[${time}] ${config.name}: +${logEntries.length} logs (${errors.length} error(s)) — read logs.json to see details and fix.`
         );
-      } else {
-        console.log(`[${time}] ${config.name}: +${newEntries.length} logs`);
+      } else if (logEntries.length > 0) {
+        console.log(`[${time}] ${config.name}: +${logEntries.length} logs`);
       }
     } catch {
       // Network error, will retry
