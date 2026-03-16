@@ -34,37 +34,40 @@ Chrome DevTools MCP ◄───────────────────
 
 You add `?loops` to your staging URL to activate dev mode. Without it, only published scripts load — so production visitors never see work-in-progress code.
 
-## Quick Start
+## Getting Started
+
+If you don't know what any of the commands below mean, that's fine. Install the [agent skill](skills/loops-webflow/SKILL.md) and your AI agent will handle all of this for you — the setup, the scripting, the debugging, everything. Just tell it what you want your Webflow site to do.
+
+### Setup
 
 ```bash
-# Install
 npm install -g loops-cli
-
-# Create account
 loops signup
-
-# Create a project (creates a directory with scripts/ folder)
 loops init my-site
-
-# The init command prints a <script> tag.
-# Paste it in Webflow → Site Settings → Custom Code → Before </body>
-# Then publish your staging site.
-
-# Add a script
-cd my-site
-loops add homepage
-
-# Start the watcher (syncs on every save)
-loops start
-
-# Edit scripts/homepage.js in your editor.
-# Open your staging site with ?loops in the URL.
-# Changes appear in ~1 second.
 ```
 
-## Script Naming = Page Scoping
+The `init` command prints a `<script>` tag. Paste it in Webflow → Site Settings → Custom Code → Before `</body>`, then publish your staging site. That's the only time you touch Webflow.
 
-The script filename determines which pages it loads on:
+### Write Code
+
+```bash
+cd my-site
+loops add homepage
+loops start
+```
+
+Edit `scripts/homepage.js`. Save. It's live on your staging site in under a second.
+
+### Ship It
+
+```bash
+loops publish homepage      # Production visitors see it
+loops unpublish homepage    # Pull it back
+```
+
+### Script Naming = Page Scoping
+
+The filename decides which pages the script loads on:
 
 | File | Loads on |
 |------|----------|
@@ -74,34 +77,30 @@ The script filename determines which pages it loads on:
 | `scripts/global-nav.js` | Every page |
 | `scripts/global-analytics.js` | Every page |
 
-Any script prefixed with `global-` runs on all pages. Everything else matches the page slug.
+Prefix with `global-` to run on all pages. Everything else matches the page slug.
 
-## Publishing
+---
 
-Dev mode (`?loops`) loads your latest saved code. When you're ready for production visitors:
+## Under the Hood
 
-```bash
-loops publish homepage     # Now loads without ?loops
-loops unpublish homepage   # Pull it back
-```
+The rest of this README is for people who want to understand the internals or contribute. You don't need any of this to use Loops.
 
-## AI Workflow
+### AI Workflow
 
-Loops is designed to work with AI coding agents. The included [agent skill](skills/loops-webflow/SKILL.md) teaches the agent the full workflow:
+Loops ships with an [agent skill](skills/loops-webflow/SKILL.md) that teaches AI coding agents the full workflow. When installed, the agent knows how to:
 
-1. Start the watcher
-2. Inspect the page with Chrome DevTools MCP (`take_screenshot`, `evaluate_script`)
-3. Write the script using real class names from the live DOM
-4. Save → auto-push → auto-reload
-5. Verify with `list_console_messages` and `take_screenshot`
-6. Iterate until it works, then `loops publish`
+1. Start the file watcher
+2. Inspect the live page with Chrome DevTools MCP (`take_screenshot`, `evaluate_script`)
+3. Write scripts using real class names from the live DOM
+4. Save → auto-push → auto-reload → verify with `list_console_messages`
+5. Iterate until it works, then `loops publish`
 
 To set up Chrome DevTools MCP:
 ```bash
 claude mcp add chrome-devtools -- npx chrome-devtools-mcp@latest --autoConnect
 ```
 
-## Commands
+### All Commands
 
 | Command | |
 |---------|---|
@@ -117,9 +116,9 @@ claude mcp add chrome-devtools -- npx chrome-devtools-mcp@latest --autoConnect
 | `loops publish <script>` | Ship to production |
 | `loops unpublish <script>` | Remove from production |
 
-## Architecture
+### Architecture
 
-The backend runs on [Convex](https://convex.dev) — database, file storage, and HTTP endpoints in one service. No infrastructure to manage.
+The backend runs on [Convex](https://convex.dev) — database, file storage, and HTTP endpoints in one service.
 
 ```
 packages/
