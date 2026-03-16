@@ -2,9 +2,15 @@
 
 Write JavaScript for your Webflow site from your local editor. Changes appear on the staging site in under a second. No deploy steps, no copy-pasting, no waiting.
 
-## Why
+## The Problem
 
-Webflow doesn't have a local development story for custom code. You're stuck editing in a tiny code embed, publishing, refreshing, and hoping. Loops fixes this:
+If you've tried adding custom JavaScript to a Webflow site, you know the pain. You write code in a cramped embed box with no syntax highlighting, hit publish, wait for the site to deploy, open the staging URL, open the browser console, squint at the output, go back to Webflow, edit the embed, publish again. Every change is a multi-minute round trip through a UI that was never designed for code.
+
+And if you're working with an AI coding agent? Forget it. The agent can't see the browser. It can't read console output. It can't check if the animation actually fired or if the selector even matched anything. It writes code blind, you paste it into Webflow blind, and you both hope for the best.
+
+Loops exists because that workflow is broken. The idea is simple: your code lives in local `.js` files, a watcher syncs them to the cloud on every save, and the Webflow site picks up changes instantly. But the part that makes it actually useful — especially with AI — is closing the feedback loop. The agent writes code, the browser reloads, and Chrome DevTools MCP pipes the results (console logs, screenshots, DOM queries) straight back to the agent. No human in the middle copying and pasting. The agent can see what it built, verify it works, and fix it — all in one tight loop.
+
+## What It Does
 
 - **Edit locally.** Write real `.js` files in your editor with full syntax highlighting, autocomplete, and version control.
 - **Instant sync.** A file watcher pushes every save to the cloud. Your Webflow staging site reloads automatically.
