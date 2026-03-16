@@ -6,3 +6,4 @@ dist/
 logs.json
 .loops.json
 .DS_Store
+.env.md
