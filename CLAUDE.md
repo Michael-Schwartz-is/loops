@@ -1,14 +1,14 @@
 # Loops
 
-Live coding tool for Webflow. Edit scripts locally, they sync to the cloud and run on your Webflow staging site. Logs flow back so you can debug.
+Live coding tool for Webflow. Edit scripts locally, they sync to the cloud via Convex and run on your Webflow staging site. Chrome DevTools MCP provides AI feedback.
 
 ## Project Structure
 
 ```
 packages/
-  shared/    — Shared TypeScript types (LogEntry, ProjectConfig, ProjectMeta)
-  worker/    — Cloudflare Worker API (Hono + R2 + D1 + KV)
-  cli/       — CLI tool (init, add, start, status, export)
+  shared/    — Shared TypeScript types (ProjectConfig, Credentials)
+  convex/    — Convex backend (DB, file storage, HTTP actions)
+  cli/       — CLI tool (signup, login, init, add, start, status, publish, unpublish)
 ```
 
 ## Development
@@ -17,23 +17,34 @@ packages/
 npm install
 npm run build -w packages/cli
 
-# Run worker locally:
-cd packages/worker && npx wrangler dev --local
+# Run Convex dev server:
+cd packages/convex && npx convex dev
 
-# In another terminal, test:
-cd packages/cli && node dist/index.js init myproject --api-url http://localhost:8787
+# In another terminal, test CLI:
+cd packages/cli && node dist/index.js --help
 ```
 
-## Production
+## Architecture
 
-- **Worker URL:** https://loops.mike-a99.workers.dev
+- **Backend:** Convex (replaces Cloudflare Worker + R2 + D1 + KV)
+- **Auth:** Email/password with scrypt hashing, API keys with SHA-256
+- **Script storage:** Convex file storage (WIP + published versions)
+- **Realtime reload:** Convex WebSocket subscriptions via ConvexClient in loader
+- **Feedback:** Chrome DevTools MCP (replaces log pipeline)
 
-## Deploying the Worker
+## CLI Commands
 
-1. `npx wrangler login`
-2. Create resources:
-   - `npx wrangler r2 bucket create loops-scripts`
-   - `npx wrangler d1 create loops-logs` → copy the database_id into wrangler.toml
-   - `npx wrangler kv namespace create META` → copy the id into wrangler.toml
-3. Apply D1 schema: `npx wrangler d1 execute loops-logs --remote --file=schema.sql`
-4. `npx wrangler deploy`
+- `loops signup` / `loops login` / `loops logout` — Account management
+- `loops forgot-password` — Password reset via email
+- `loops init <site-name>` — Create project, get loader tag
+- `loops add <script-name>` — Add a script file
+- `loops remove <script-name>` — Remove a script
+- `loops start` — Watch & sync all projects
+- `loops status` — Show projects and script versions
+- `loops publish <script>` / `loops unpublish <script>` — Production deployment
+
+## Deploying
+
+```bash
+cd packages/convex && npx convex deploy
+```

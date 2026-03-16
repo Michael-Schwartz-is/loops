@@ -1,0 +1,18 @@
+{
+  "name": "@loops/convex",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./convex/_generated/api": "./convex/_generated/api.js"
+  },
+  "scripts": {
+    "dev": "npx convex dev",
+    "deploy": "npx convex deploy"
+  },
+  "dependencies": {
+    "@noble/hashes": "^2.0.1",
+    "convex": "^1.0.0",
+    "resend": "^6.9.4"
+  }
+}

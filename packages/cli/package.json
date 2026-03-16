@@ -1,6 +1,6 @@
 {
   "name": "loops-cli",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Live coding tool for Webflow. Edit scripts locally, sync to staging, debug with live logs.",
   "type": "module",
   "license": "MIT",
@@ -26,8 +26,10 @@
     "postinstall": "echo '\n✓ loops-cli installed. Run: loops init <project-name>\n'"
   },
   "dependencies": {
+    "@loops/convex": "*",
     "chokidar": "^4.0.0",
-    "commander": "^13.0.0"
+    "commander": "^13.0.0",
+    "convex": "^1.0.0"
   },
   "devDependencies": {
     "@loops/shared": "*",

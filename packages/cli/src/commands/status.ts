@@ -1,94 +1,49 @@
-import fs from "node:fs/promises";
-import path from "node:path";
-import { findProjects, loadConfig } from "../config.js";
-import type { ProjectConfig } from "@loops/shared";
+import { Command } from "commander";
+import { relative } from "path";
+import { findProjects, readConfig } from "../config.js";
+import { getCredentialsOrThrow } from "../credentials.js";
+import { getConvexClient } from "../convex.js";
+import { api } from "@loops/convex/convex/_generated/api";
 
-export async function statusCommand(opts: { remote?: boolean }) {
-  const cwd = process.cwd();
-  const projects = await findProjects(cwd);
+export const statusCommand = new Command("status")
+  .description("Show projects and scripts")
+  .action(async () => {
+    const creds = getCredentialsOrThrow();
+    const baseDir = process.cwd();
+    const projects = findProjects(baseDir);
 
-  // Also check if cwd itself is a project
-  const cwdConfig = await loadConfig(cwd);
-  if (cwdConfig) {
-    projects.push({ dir: cwd, config: cwdConfig });
-  }
-
-  if (projects.length === 0) {
-    console.log("No Loops projects found.");
-    return;
-  }
-
-  console.log(`\n${projects.length} project(s)\n`);
-
-  for (const { dir, config } of projects) {
-    console.log(`  ${config.name} (${config.projectId})`);
-    console.log(`    API: ${config.apiUrl}`);
-    if (config.scripts.length > 0) {
-      console.log(`    Local scripts: ${config.scripts.join(", ")}`);
-    } else {
-      console.log(`    Local scripts: (none)`);
-    }
-
-    if (opts.remote) {
-      await showRemoteStatus(dir, config);
-    }
-
-    console.log("");
-  }
-}
-
-async function showRemoteStatus(dir: string, config: ProjectConfig) {
-  try {
-    const res = await fetch(
-      `${config.apiUrl}/debug/${config.projectId}`,
-      { headers: { Authorization: `Bearer ${config.authToken}` } }
-    );
-
-    if (!res.ok) {
-      console.log(`    Remote: failed to fetch (${res.status})`);
+    if (projects.length === 0) {
+      console.log("No projects found.");
       return;
     }
 
-    const data = await res.json() as {
-      meta: { version: number; scripts: string[]; updatedAt: string } | null;
-      r2Version: number | null;
-      scripts: { name: string; size: number; preview: string }[];
-    };
+    const client = getConvexClient();
 
-    if (!data.meta) {
-      console.log("    Remote: project not found on server");
-      return;
-    }
+    for (const projectDir of projects) {
+      const config = readConfig(projectDir);
+      console.log(`\n${relative(baseDir, projectDir)}/`);
+      console.log(`  Project: ${config.projectId}`);
 
-    console.log(`    Server version: ${data.meta.version} (R2: ${data.r2Version ?? "n/a"})`);
-    console.log(`    Last updated: ${data.meta.updatedAt}`);
+      try {
+        const scripts = await client.query(api.scripts.listScripts, {
+          privateKey: creds.privateKey,
+          projectId: config.projectId,
+        });
 
-    if (data.scripts.length === 0) {
-      console.log("    Server scripts: (none)");
-    } else {
-      for (const s of data.scripts) {
-        // Compare with local file
-        const localPath = path.join(dir, "scripts", `${s.name}.js`);
-        let localSize = "missing";
-        try {
-          const stat = await fs.stat(localPath);
-          localSize = `${stat.size}b`;
-        } catch {
-          // File doesn't exist locally
+        if (scripts.length === 0) {
+          console.log("  No scripts");
+        } else {
+          for (const s of scripts) {
+            const pubStatus = s.publishedVersion
+              ? `published (v${s.publishedVersion})`
+              : "not published";
+            console.log(
+              `  ${s.scriptName}.js — WIP v${s.wipVersion}, ${pubStatus}`
+            );
+          }
         }
-
-        console.log(`    ${s.name}: ${s.size}b on server, ${localSize} local`);
-        console.log(`      preview: ${s.preview.replace(/\n/g, "\\n").slice(0, 80)}`);
+      } catch (err: any) {
+        console.error(`  Error: ${err.message}`);
       }
     }
-
-    // Check for scripts in local config but not on server
-    const serverNames = data.scripts.map((s) => s.name);
-    const missing = config.scripts.filter((s) => !serverNames.includes(s));
-    if (missing.length > 0) {
-      console.log(`    Not on server: ${missing.join(", ")}`);
-    }
-  } catch (err: any) {
-    console.log(`    Remote: ${err.message}`);
-  }
-}
+  });

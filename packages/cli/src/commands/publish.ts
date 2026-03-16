@@ -1,14 +1,12 @@
 import { Command } from "commander";
-import { unlinkSync, existsSync } from "fs";
-import { join } from "path";
 import { readConfig, findProjectDir } from "../config.js";
 import { getCredentialsOrThrow } from "../credentials.js";
 import { getConvexClient } from "../convex.js";
 import { api } from "@loops/convex/convex/_generated/api";
 
-export const removeCommand = new Command("remove")
-  .argument("<script-name>", "Script name to remove")
-  .description("Remove a script from the project")
+export const publishCommand = new Command("publish")
+  .argument("<script-name>", "Script to publish")
+  .description("Publish the current WIP version of a script")
   .action(async (scriptName: string) => {
     const projectDir = findProjectDir(process.cwd());
     if (!projectDir) {
@@ -21,19 +19,17 @@ export const removeCommand = new Command("remove")
 
     try {
       const client = getConvexClient();
-      await client.mutation(api.scripts.removeScript, {
+      await client.mutation(api.scripts.publishScript, {
         privateKey: creds.privateKey,
         projectId: config.projectId,
         scriptName,
       });
-    } catch {
-      // Script may not exist remotely yet, continue with local removal
-    }
 
-    const scriptPath = join(projectDir, "scripts", `${scriptName}.js`);
-    if (existsSync(scriptPath)) {
-      unlinkSync(scriptPath);
+      console.log(
+        `Published ${scriptName}! It now loads for all visitors (without ?loops).`
+      );
+    } catch (err: any) {
+      console.error(`Publish failed: ${err.message}`);
+      process.exit(1);
     }
-
-    console.log(`Removed ${scriptName}`);
   });

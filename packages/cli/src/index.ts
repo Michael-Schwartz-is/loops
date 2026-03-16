@@ -1,56 +1,46 @@
 #!/usr/bin/env node
-import { program } from "commander";
+
+import { Command } from "commander";
+import { signupCommand } from "./commands/signup.js";
+import { loginCommand } from "./commands/login.js";
+import { logoutCommand } from "./commands/logout.js";
+import { forgotPasswordCommand } from "./commands/forgotPassword.js";
 import { initCommand } from "./commands/init.js";
 import { addCommand } from "./commands/add.js";
 import { removeCommand } from "./commands/remove.js";
 import { startCommand } from "./commands/start.js";
 import { statusCommand } from "./commands/status.js";
-import { exportCommand } from "./commands/exportCmd.js";
-import { clearLogsCommand } from "./commands/clearLogs.js";
-import { DEFAULT_API_URL } from "./config.js";
+import { publishCommand } from "./commands/publish.js";
+import { unpublishCommand } from "./commands/unpublish.js";
+
+const program = new Command();
 
 program
   .name("loops")
   .description("Live coding tool for Webflow")
-  .version("0.1.0");
+  .version("0.3.0");
 
-program
-  .command("init <project-name>")
-  .description("Create a new Loops project")
-  .option("--api-url <url>", "API URL", DEFAULT_API_URL)
-  .action(initCommand);
+// Auth
+program.addCommand(signupCommand);
+program.addCommand(loginCommand);
+program.addCommand(logoutCommand);
+program.addCommand(forgotPasswordCommand);
 
-program
-  .command("add <project> <script-name>")
-  .description("Add a script to a project")
-  .action(addCommand);
+// Project management
+program.addCommand(initCommand);
 
-program
-  .command("remove <project> <script-name>")
-  .description("Remove a script from a project")
-  .action(removeCommand);
+// Script management
+program.addCommand(addCommand);
+program.addCommand(removeCommand);
 
-program
-  .command("start")
-  .description("Watch all projects and sync scripts/logs")
-  .option("--poll-interval <ms>", "Log poll interval in ms", "3000")
-  .action(startCommand);
+// Development
+program.addCommand(startCommand);
 
-program
-  .command("status")
-  .description("Show all projects and scripts")
-  .option("--remote", "Fetch server-side state for comparison")
-  .action(statusCommand);
+// Publishing
+program.addCommand(publishCommand);
+program.addCommand(unpublishCommand);
 
-program
-  .command("export <project>")
-  .description("Export scripts for self-hosting")
-  .option("--inline", "Output code ready to paste in Webflow")
-  .action(exportCommand);
-
-program
-  .command("clear-logs <project>")
-  .description("Delete all logs for a project (remote + local)")
-  .action(clearLogsCommand);
+// Utility
+program.addCommand(statusCommand);
 
 program.parse();

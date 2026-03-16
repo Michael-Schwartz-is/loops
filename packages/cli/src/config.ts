@@ -1,43 +1,49 @@
-import fs from "node:fs/promises";
-import path from "node:path";
-import type { ProjectConfig } from "@loops/shared";
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "fs";
+import { join } from "path";
 
-export const DEFAULT_API_URL = "https://loops.mike-a99.workers.dev";
-const CONFIG_FILE = ".loops.json";
+export interface ProjectConfig {
+  projectId: string;
+  publicKey: string;
+}
 
-export async function loadConfig(dir: string): Promise<ProjectConfig | null> {
+export function readConfig(projectDir: string): ProjectConfig {
+  const configPath = join(projectDir, ".loops.json");
+  if (!existsSync(configPath)) {
+    throw new Error(`No .loops.json found in ${projectDir}`);
+  }
+  return JSON.parse(readFileSync(configPath, "utf-8"));
+}
+
+export function writeConfig(projectDir: string, config: ProjectConfig): void {
+  const configPath = join(projectDir, ".loops.json");
+  writeFileSync(configPath, JSON.stringify(config, null, 2));
+}
+
+export function findProjects(baseDir: string): string[] {
+  const projects: string[] = [];
   try {
-    const raw = await fs.readFile(path.join(dir, CONFIG_FILE), "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-export async function saveConfig(
-  dir: string,
-  config: ProjectConfig
-): Promise<void> {
-  await fs.writeFile(
-    path.join(dir, CONFIG_FILE),
-    JSON.stringify(config, null, 2) + "\n"
-  );
-}
-
-export async function findProjects(
-  baseDir: string
-): Promise<{ dir: string; config: ProjectConfig }[]> {
-  const projects: { dir: string; config: ProjectConfig }[] = [];
-
-  const entries = await fs.readdir(baseDir, { withFileTypes: true });
-  for (const entry of entries) {
-    if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
-    const dir = path.join(baseDir, entry.name);
-    const config = await loadConfig(dir);
-    if (config) {
-      projects.push({ dir, config });
+    const entries = readdirSync(baseDir);
+    for (const entry of entries) {
+      const fullPath = join(baseDir, entry);
+      if (statSync(fullPath).isDirectory()) {
+        const configPath = join(fullPath, ".loops.json");
+        if (existsSync(configPath)) {
+          projects.push(fullPath);
+        }
+      }
     }
+  } catch {
+    // ignore
   }
-
   return projects;
+}
+
+export function findProjectDir(dir: string): string | null {
+  let current = dir;
+  while (true) {
+    if (existsSync(join(current, ".loops.json"))) return current;
+    const parent = join(current, "..");
+    if (parent === current) return null;
+    current = parent;
+  }
 }

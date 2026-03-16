@@ -1,88 +1,64 @@
-import fs from "node:fs/promises";
-import path from "node:path";
-import { loadConfig, saveConfig } from "../config.js";
+import { Command } from "commander";
+import { writeFileSync, readFileSync, existsSync } from "fs";
+import { join } from "path";
+import { readConfig, findProjectDir } from "../config.js";
 
-export async function addCommand(
-  projectName: string,
-  scriptName: string,
-  opts: { apiUrl?: string }
-) {
-  const projectDir = path.resolve(projectName);
-  const config = await loadConfig(projectDir);
-
-  if (!config) {
-    console.error(
-      `No .loops.json found in ${projectDir}. Run "loops init ${projectName}" first.`
-    );
-    process.exit(1);
-  }
-
-  if (config.scripts.includes(scriptName)) {
-    console.error(`Script "${scriptName}" already exists in ${projectName}.`);
-    process.exit(1);
-  }
-
-  // Create the script file
-  const scriptPath = path.join(projectDir, "scripts", `${scriptName}.js`);
-  const code = `// ${scriptName} — ${config.name}\nconsole.log("[Loops] ${scriptName} loaded");\n`;
-  await fs.writeFile(scriptPath, code);
-
-  // Push to worker immediately so the script tag works right away
-  const pushRes = await fetch(
-    `${config.apiUrl}/code/${config.projectId}/${scriptName}`,
-    {
-      method: "PUT",
-      headers: {
-        "Content-Type": "text/plain",
-        Authorization: `Bearer ${config.authToken}`,
-      },
-      body: code,
+export const addCommand = new Command("add")
+  .argument("<script-name>", "Script name (e.g. homepage, global-nav)")
+  .description("Add a new script to the current project")
+  .action(async (scriptName: string) => {
+    const projectDir = findProjectDir(process.cwd());
+    if (!projectDir) {
+      console.error(
+        "No .loops.json found. Run this from inside a project directory."
+      );
+      process.exit(1);
     }
-  );
 
-  if (!pushRes.ok) {
-    const body = await pushRes.text();
-    console.error(`Warning: failed to push script to worker: ${pushRes.status} ${body}`);
-  }
+    // Validate script name
+    if (!/^[a-zA-Z0-9-]+$/.test(scriptName)) {
+      console.error(
+        "Script name must be alphanumeric with hyphens only (e.g. homepage, global-nav)"
+      );
+      process.exit(1);
+    }
 
-  // Update config
-  config.scripts.push(scriptName);
-  await saveConfig(projectDir, config);
+    const config = readConfig(projectDir);
+    const scriptPath = join(projectDir, "scripts", `${scriptName}.js`);
 
-  // Update LOOPS.md script list
-  await updateLoopsMd(projectDir, config.scripts, config.name);
+    if (existsSync(scriptPath)) {
+      console.error(`Script ${scriptName}.js already exists`);
+      process.exit(1);
+    }
 
-  const scriptTag = `<script src="${config.apiUrl}/s/${config.projectId}/${scriptName}"></script>`;
+    // Create script file with template
+    const template = `// ${scriptName}.js — ${config.projectId}
+// This script ${scriptName.startsWith("global-") ? "loads on every page" : `loads on the "${scriptName}" page`}
 
-  console.log(`\nAdded script "${scriptName}" to ${projectName}.\n`);
-  console.log(`Paste this in Webflow on the relevant page → Custom Code → Before </body>:\n`);
-  console.log(`  ${scriptTag}\n`);
-  console.log(`Next step: Run \`loops start\` to begin syncing.`);
-  console.log(`Then read ${projectName}/page-context.html for the live DOM class names before writing code.\n`);
-}
+console.log("${scriptName} script loaded");
+`;
 
-async function updateLoopsMd(
-  projectDir: string,
-  scripts: string[],
-  projectName: string
-) {
-  const mdPath = path.join(projectDir, "LOOPS.md");
-  try {
-    let content = await fs.readFile(mdPath, "utf-8");
+    writeFileSync(scriptPath, template);
 
-    // Replace the scripts section
-    const scriptsSection =
-      scripts.length > 0
-        ? scripts.map((s) => `- ${s}.js`).join("\n")
-        : "(none yet)";
+    // Update LOOPS.md
+    updateLoopsMd(projectDir, scriptName);
 
-    content = content.replace(
-      /## Scripts in this project\n[\s\S]*?(?=\n## )/,
-      `## Scripts in this project\n${scriptsSection}\n\n`
-    );
+    console.log(`Created scripts/${scriptName}.js`);
+    console.log(`Start \`loops start\` to sync changes automatically.`);
+  });
 
-    await fs.writeFile(mdPath, content);
-  } catch {
-    // LOOPS.md doesn't exist, skip
+function updateLoopsMd(projectDir: string, scriptName: string): void {
+  const loopsMdPath = join(projectDir, "LOOPS.md");
+  if (!existsSync(loopsMdPath)) return;
+
+  let content = readFileSync(loopsMdPath, "utf-8");
+  const scope = scriptName.startsWith("global-")
+    ? "all pages"
+    : `"${scriptName}" page`;
+  const entry = `- \`scripts/${scriptName}.js\` — ${scope}\n`;
+
+  if (!content.includes(entry)) {
+    content += entry;
+    writeFileSync(loopsMdPath, content);
   }
 }

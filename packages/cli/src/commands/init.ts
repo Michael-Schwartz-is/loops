@@ -1,78 +1,92 @@
-import fs from "node:fs/promises";
-import path from "node:path";
-import { saveConfig, DEFAULT_API_URL } from "../config.js";
+import { Command } from "commander";
+import { mkdirSync, writeFileSync, existsSync } from "fs";
+import { join } from "path";
+import { getConvexClient } from "../convex.js";
+import { getCredentialsOrThrow } from "../credentials.js";
+import { writeConfig } from "../config.js";
+import { api } from "@loops/convex/convex/_generated/api";
 
-export async function initCommand(
-  projectName: string,
-  opts: { apiUrl?: string }
-) {
-  const apiUrl = opts.apiUrl || DEFAULT_API_URL;
-  const projectDir = path.resolve(projectName);
+const CONVEX_SITE_URL = "https://greedy-flamingo-603.convex.site";
 
-  // Create project directory
-  await fs.mkdir(projectDir, { recursive: true });
-  await fs.mkdir(path.join(projectDir, "scripts"), { recursive: true });
+export const initCommand = new Command("init")
+  .argument("<site-name>", "Webflow site name (e.g. acme-corp)")
+  .description("Create a new Loops project")
+  .action(async (siteName: string) => {
+    const creds = getCredentialsOrThrow();
+    const projectDir = join(process.cwd(), siteName);
 
-  // Register with API
-  const res = await fetch(`${apiUrl}/projects`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: projectName }),
+    if (existsSync(projectDir)) {
+      console.error(`Directory ${siteName}/ already exists`);
+      process.exit(1);
+    }
+
+    try {
+      const client = getConvexClient();
+      const result = await client.mutation(api.projects.createProject, {
+        privateKey: creds.privateKey,
+        projectId: siteName,
+      });
+
+      // Create local directory structure
+      mkdirSync(join(projectDir, "scripts"), { recursive: true });
+
+      writeConfig(projectDir, {
+        projectId: siteName,
+        publicKey: result.publicKey,
+      });
+
+      // Generate LOOPS.md
+      const loopsmd = generateLoopsMd(siteName);
+      writeFileSync(join(projectDir, "LOOPS.md"), loopsmd);
+
+      const loaderTag = `<script src="${CONVEX_SITE_URL}/loader/${result.publicKey}/${siteName}"></script>`;
+
+      console.log(`\nProject "${siteName}" created!`);
+      console.log(
+        `\nPaste this in Webflow → Site Settings → Custom Code → Before </body>:\n`
+      );
+      console.log(`  ${loaderTag}`);
+      console.log(`\nThen publish your staging site.`);
+    } catch (err: any) {
+      console.error("Init failed:", err.message);
+      process.exit(1);
+    }
   });
 
-  if (!res.ok) {
-    const body = await res.text();
-    console.error(`Failed to create project: ${res.status} ${body}`);
-    process.exit(1);
-  }
+function generateLoopsMd(siteName: string): string {
+  return `# ${siteName} — Loops Project
 
-  const { projectId, authToken, baseTag } = await res.json();
+## How This Works
 
-  // Save config
-  await saveConfig(projectDir, {
-    name: projectName,
-    projectId,
-    apiUrl,
-    authToken,
-    scripts: [],
-  });
+You edit JavaScript files in \`scripts/\`. A file watcher (\`loops start\`) pushes changes to the cloud instantly. The Webflow staging site reloads automatically.
 
-  // Create LOOPS.md
-  const guide = `# Loops Project: ${projectName}
+## Feedback Loop
 
-## Workflow
-1. Add a script: \`loops add ${projectName} <script-name>\`
-2. Paste the script tag it gives you into Webflow (page-level or site-level)
-3. Run \`loops start\` — keeps scripts synced and pulls logs while you work
-4. Edit files in ./scripts/ — changes sync to the live site automatically
+Use Chrome DevTools MCP to see results:
+- \`list_console_messages\` — read script console output
+- \`take_screenshot\` — visually verify changes
+- \`evaluate_script\` — test selectors in the live page
+- \`list_network_requests\` — debug API calls
 
-## Key files
-- \`scripts/*.js\` — your code, each file is served to Webflow
-- \`page-context.html\` — the live DOM from your Webflow site (auto-updated by \`loops start\`). READ THIS to find class names and element structure before writing code.
-- \`logs.json\` — browser console output and errors from your site
-- \`.loops.json\` — project config (do not edit)
+After saving a file, the page reloads automatically (<1 second). Then check results with the tools above.
 
-## Scripts in this project
-(none yet — use \`loops add\` to create scripts)
+## Webflow Coding Rules
 
-## Rules for writing Webflow scripts
-- Scripts load before \`</body>\` so the DOM is ready. Do NOT wrap code in DOMContentLoaded.
-- The HTML and CSS are built in Webflow. NEVER generate HTML with JavaScript.
-- Read \`page-context.html\` to find the real class names (\`.hero-section_home\`, \`.nav_link\`, etc).
-- Code adds BEHAVIOR: animations, interactions, form logic, API calls.
-- Use GSAP/ScrollTrigger for animations (loaded via Webflow).
+- **NEVER generate HTML with JavaScript.** The HTML/CSS is built in Webflow.
+- Select elements by their Webflow class names (\`.hero-section_home\`, \`.nav_link\`).
+- Your code adds **behavior**: animations, interactions, form logic, API calls.
+- Use GSAP/ScrollTrigger for animations (load from CDN if needed).
 - Work with the existing DOM — query it, animate it, enhance it. Don't replace it.
 - Always verify selectors exist before operating on them. Log if not found.
-- Webflow uses IX2 (Interactions 2) for animations — it sets inline styles (height, opacity, display). Check inline styles, not classes, to detect open/closed state.
+
+## Writing Useful Logs
+
+Add \`console.log()\` at key steps — specific, actionable messages:
+- \`console.log("Selected .card elements:", cards.length, "found")\`
+- \`console.log("Animation applied to", els.length, "elements, 0.15s stagger")\`
+
+## Scripts
+
+(auto-updated by \`loops add\` / \`loops remove\`)
 `;
-
-  await fs.writeFile(path.join(projectDir, "LOOPS.md"), guide);
-  await fs.writeFile(path.join(projectDir, "logs.json"), "[]\n");
-
-  console.log(`\nProject "${projectName}" created with ID ${projectId}.\n`);
-  console.log(`To connect it to your Webflow site:`);
-  console.log(`  1. Go to Webflow → Site Settings → Custom Code → Before </body>`);
-  console.log(`  2. Paste this script tag:\n`);
-  console.log(`     ${baseTag}\n`);
-  console.log(`Next step: Read ${projectName}/LOOPS.md, then run: loops add ${projectName} <script-name>\n`);
 }
